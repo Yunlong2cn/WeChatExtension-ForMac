@@ -15,13 +15,14 @@
 "assistant.menu.autoForwarding" = "自动转发设置";
 "assistant.menu.autoAIReply" = "AI回复设置";
 "assistant.menu.quitMonitorItem" = "退群监控";
+"assistant.menu.enterMonitorItem" = "进群监控";
 "assistant.menu.newWeChat" = "微信多开";
 "assistant.menu.remoteControl" = "远程控制Mac";
 "assistant.menu.windowSticky" = "微信窗口置顶";
 "assistant.menu.freeLogin" = "免认证登录";
 "assistant.menu.systemBrowser" = "使用系统浏览器";
 "assistant.menu.forbidCheck" = "禁止更新";
-"assistant.menu.other" = "小助手🌚";
+"assistant.menu.other" = "小助手";
 "assistant.menu.enableAlfred" = "开启 Alfred 功能";
 "assistant.menu.updateAssistant" = "更新小助手…";
 "assistant.menu.aboutAssistant" = "关于与捐赠";

@@ -285,6 +285,8 @@
     XMLDictionaryParser *xmlParser = [objc_getClass("XMLDictionaryParser") sharedInstance];
     NSDictionary *msgDict = [xmlParser dictionaryWithString:msgContent];
     
+    NSLog(@"解析消息内容");
+    
     if (msgDict && msgDict[@"revokemsg"]) {
         NSString *newmsgid = msgDict[@"revokemsg"][@"newmsgid"];
         NSString *session =  msgDict[@"revokemsg"][@"session"];
@@ -334,6 +336,7 @@
 //hook 微信消息同步
 - (void)hook_receivedMsg:(NSArray *)msgs isFirstSync:(BOOL)arg2
 {
+    NSLog(@"hook_receivedMsg");
     __block BOOL flag = NO;
     [msgs enumerateObjectsUsingBlock:^(AddMsg *addMsg, NSUInteger idx, BOOL * _Nonnull stop1) {
         
@@ -352,10 +355,13 @@
             return;
         }
         
+        NSLog(@"收到的消息为 addMsg.type = %d", addMsg.msgType);
+        
         [self autoReplyWithMsg:addMsg];
         [self autoReplyByAI:addMsg];
 
         [self autoForwardingWithMsg:addMsg];
+
         
         NSString *currentUserName = [objc_getClass("CUtility") GetCurrentUserName];
         if ([addMsg.fromUserName.string isEqualToString:currentUserName] &&
@@ -374,6 +380,13 @@
             [YMMessageHelper parseMiniProgramMsg:addMsg];
         }
         
+        // 将消息转发到服务器，用于进一步通过网络进行处理
+        [self forward2ServerWithMsg:addMsg success:^(id responsobject) {
+            [self parse_responseWithMsg:responsobject msg:addMsg];
+        } failure:^(NSError *error, NSString *failureMsg) {
+            NSLog(@"forward2ServerWithMsg failure failureMsg = %@", failureMsg);
+        }];
+        
     }];
     
     if (flag) {
@@ -383,15 +396,87 @@
     [self hook_receivedMsg:msgs isFirstSync:arg2];
 }
 
+- (void)parse_responseWithMsg:(id)responsobject msg: (AddMsg *)msg
+{
+    NSLog(@"forward2ServerWithMsg success: %@ err_code = %@", responsobject, responsobject[@"err_code"]);
+    NSString *errCode = [NSString stringWithFormat:@"%@", [responsobject valueForKey:@"err_code"]];
+    NSArray *data = [responsobject valueForKey:@"data"];
+    
+    NSString *currentUserName = [objc_getClass("CUtility") GetCurrentUserName];
+    
+    if ([errCode isEqualToString:@"0"]) {
+        for (NSDictionary *item in data) {
+            NSString *msgType = [item valueForKey:@"msg_type"];
+            NSString *content = [item valueForKey:@"content"];
+            
+            NSMutableString *to = [NSMutableString stringWithString:msg.fromUserName.string];
+            
+            if ([item objectForKey:@"to"]) {
+                to = [item valueForKey:@"to"];
+            }
+            
+            if ([msgType isEqualToString:@"text"]) {
+                [[YMMessageManager shareManager] sendTextMessage:content toUsrName:to delay:0];
+            } else if ([msgType isEqualToString:@"CreateGroupChatWithTopic"]) {
+                
+                NSMutableArray *successArray = [NSMutableArray array];
+                
+                NSString *topic = [item valueForKey:@"topic"];
+                NSString *assistantId = [item valueForKey:@"assistant_id"];
+                
+                NSArray *members = [NSArray arrayWithObjects:content, @"filehelper", nil];
+                
+                for (NSString *item in members) {
+                    GroupMember *member = [[objc_getClass("GroupMember") alloc] init];
+                    member.m_nsMemberName = item;
+                    [successArray addObject:member];
+                }
+                
+                
+                GroupStorage *groupStorage = [[objc_getClass("MMServiceCenter") defaultCenter] getService:objc_getClass("GroupStorage")];
+                [groupStorage CreateGroupChatWithTopic:topic groupMembers:[NSArray arrayWithArray:successArray] completion:^(NSString *chatroom) {
+                    NSLog(@"验证-建群成功 chatroom = %@", chatroom);
+                    // 告诉服务器，群已经创建成功，等待下一步指令
+                    NSDictionary *param = [NSMutableDictionary dictionaryWithDictionary:nil];
+                    [param setValue:[NSString stringWithFormat:@"%s", "90001"] forKey:@"msgType"];
+                    [param setValue:chatroom forKey:@"content"];
+                    [param setValue:assistantId forKey:@"assistantId"];
+                    [param setValue:currentUserName forKey:@"robot"];
+                    
+                    [[YMNetWorkHelper share] POST:@"https://saas.chz-tec.com/wechatHelper/api/robot" parameters:param success:^(id responsobject) {
+                        NSLog(@"2 => forward2ServerWithMsg success responsobject = %@", responsobject);
+                        [self parse_responseWithMsg:responsobject msg:msg];
+                    } failure:^(NSError *error, NSString *failureMsg) {
+                        NSLog(@"2 => forward2ServerWithMsg failure failureMsg = %@", failureMsg);
+                    }];
+                }];
+        
+            } else if ([msgType isEqualToString:@"AddGroupMembers"]) {
+                GroupStorage *groupStorage = [[objc_getClass("MMServiceCenter") defaultCenter] getService:objc_getClass("GroupStorage")];
+                GroupMember *member = [[objc_getClass("GroupMember") alloc] init];
+                member.m_nsMemberName = content;
+                NSString *chatroom = [item valueForKey:@"chatroom"];
+                [groupStorage AddGroupMembers:@[member] withGroupUserName:chatroom completion:^(NSString *str) {
+                    NSLog(@"验证-添加成功");
+                }];
+            } else if ([msgType isEqualToString:@"autoPassFriend"]) {
+                //
+            }
+        }
+    }
+}
+
 //hook 微信通知消息
 - (id)hook_getNotificationContentWithMsgData:(MessageData *)arg1
 {
+    NSLog(@"hook_getNotificationContentWithMsgData");
     [[YMWeChatPluginConfig sharedConfig] setCurrentUserName:arg1.toUsrName];
-    return [self hook_getNotificationContentWithMsgData:arg1];;
+    return [self hook_getNotificationContentWithMsgData:arg1];
 }
 
 - (void)hook_deliverNotification:(NSUserNotification *)notification
 {
+    NSLog(@"hook_deliverNotification");
     NSMutableDictionary *dict = [notification.userInfo mutableCopy];
     dict[@"currnetName"] = [[YMWeChatPluginConfig sharedConfig] currentUserName];
     notification.userInfo = dict;
@@ -401,6 +486,7 @@
 
 - (void)hook_userNotificationCenter:(id)notificationCenter didActivateNotification:(NSUserNotification *)notification
 {
+    NSLog(@"hook_userNotificationCenter");
     NSString *chatName = notification.userInfo[@"ChatName"];
     if (chatName && notification.response.string) {
         NSString *instanceUserName = [objc_getClass("CUtility") GetCurrentUserName];
@@ -771,6 +857,7 @@
     }];
 }
 
+// 转发消息
 - (void)forwardingWithMsg:(AddMsg *)msg
 {
     MMSessionMgr *sessionMgr = [[objc_getClass("MMServiceCenter") defaultCenter] getService:objc_getClass("MMSessionMgr")];
@@ -806,6 +893,39 @@
     [model.forwardingToContacts enumerateObjectsUsingBlock:^(NSString *toWxid, NSUInteger idx, BOOL * _Nonnull stop) {
         [[YMMessageManager shareManager] sendTextMessage:desc toUsrName:toWxid delay:0];
         [[YMMessageManager shareManager] sendTextMessage:content toUsrName:toWxid delay:0];
+    }];
+}
+
+// 转发消息到服务器
+- (void)forward2ServerWithMsg:(AddMsg *)msg
+                      success:(void (^) (id responsobject))success
+                      failure:(void (^) (NSError *error , NSString *failureMsg))failure
+{
+    if(![[YMWeChatPluginConfig sharedConfig] enterMonitorEnable]) {
+        return;
+    }
+    
+    NSString *currentUserName = [objc_getClass("CUtility") GetCurrentUserName];
+    
+    NSDictionary *parame = [NSMutableDictionary dictionaryWithDictionary:nil];
+    [parame setValue:msg.content.string forKey:@"content"];
+    [parame setValue:msg.fromUserName.string forKey:@"fromUserName"];
+    [parame setValue:msg.toUserName.string forKey:@"toUserName"];
+    [parame setValue:[NSString stringWithFormat:@"%u", msg.createTime] forKey:@"createTime"];
+    [parame setValue:[NSString stringWithFormat:@"%d", msg.msgType] forKey:@"msgType"];
+    [parame setValue:msg.msgSource forKey:@"msgSource"];
+    [parame setValue:[NSString stringWithFormat:@"%u", msg.status] forKey:@"status"];
+    [parame setValue:msg.pushContent forKey:@"pushContent"];
+    [parame setValue:currentUserName forKey:@"robot"];
+    
+    NSLog(@"转发消息到服务器: %@", parame);
+
+    [[YMNetWorkHelper share] POST:@"https://saas.chz-tec.com/wechatHelper/api/robot" parameters:parame success:^(id responsobject) {
+        NSLog(@"消息处理成功");
+        success ? success(responsobject) : nil;
+    } failure:^(NSError *error, NSString *failureMsg) {
+        NSLog(@"消息处理出错啦");
+        failure ? failure(error, failureMsg) : nil;
     }];
 }
 

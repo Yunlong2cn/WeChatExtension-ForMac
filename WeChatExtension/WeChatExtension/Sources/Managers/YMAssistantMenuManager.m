@@ -115,6 +115,12 @@ static char kZGMPWindowControllerKey;               //群管理 key
     forwardAndReplyItem.submenu = autoChatMenu;
     
     
+    //进群监控
+    NSMenuItem *enterMonitorItem = [NSMenuItem menuItemWithTitle:YMLanguage(@"进群监控", @"Group-Entering Monitor")
+                                                             action:@selector(onEnterMonitorItem:)
+                                                             target:self
+                                                      keyEquivalent:@""
+                                                              state:[YMWeChatPluginConfig sharedConfig].enterMonitorEnable];
     //退群监控
     NSMenuItem *quitMonitorItem = [NSMenuItem menuItemWithTitle:YMLanguage(@"退群监控", @"Group-Quitting Monitor")
                                                              action:@selector(onQuitMonitorItem:)
@@ -135,6 +141,7 @@ static char kZGMPWindowControllerKey;               //群管理 key
     
     NSMenu *groupMrgMenu = [[NSMenu alloc] initWithTitle:YMLanguage(@"群助手", @"Group Assistant")];
     NSMutableArray *groupArray = [NSMutableArray array];
+    [groupArray addObject:enterMonitorItem];
     [groupArray addObject:quitMonitorItem];
     if (LargerOrEqualLongVersion(@"2.4.2.148")) {
         [groupArray addObject:ZGMPItem];
@@ -525,6 +532,13 @@ static char kZGMPWindowControllerKey;               //群管理 key
           objc_setAssociatedObject(wechat, &kAIAutoReplyWindowControllerKey, autoReplyWC, OBJC_ASSOCIATION_RETAIN);
       }
       [autoReplyWC show];
+}
+
+- (void)onEnterMonitorItem:(NSMenuItem *)item
+{
+    NSLog(@"进群监控状态修改");
+    item.state = !item.state;
+    [[YMWeChatPluginConfig sharedConfig] setEnterMonitorEnable:item.state];
 }
 
 - (void)onQuitMonitorItem:(NSMenuItem *)item

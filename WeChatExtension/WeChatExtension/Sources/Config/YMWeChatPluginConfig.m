@@ -43,6 +43,7 @@ static NSString * const kTKWeChatRemotePlistPath = @"https://raw.githubuserconte
 @dynamic autoForwardingAllFriend;
 @dynamic autoAuthEnable;
 @dynamic launchFromNew;
+@dynamic enterMonitorEnable;
 @dynamic quitMonitorEnable;
 @dynamic autoLoginEnable;
 @dynamic onTop;

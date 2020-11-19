@@ -27,11 +27,12 @@ typedef NS_ENUM(NSInteger, PluginLanguageType) {
 @property (nonatomic) BOOL preventAsyncRevokeSignal;            /**<    只同步单聊    */
 @property (nonatomic) BOOL preventAsyncRevokeChatRoom;          /**<    只同步群聊    */
 @property (nonatomic) BOOL autoReplyEnable;                     /**<    是否开启自动回复  */
-@property (nonatomic) BOOL AIReplyEnable;                     /**<    是否开启自动回复  */
+@property (nonatomic) BOOL AIReplyEnable;                       /**<    是否开启自动回复  */
 @property (nonatomic) BOOL autoForwardingEnable;                /**<    是否开启自动转发  */
 @property (nonatomic) BOOL autoForwardingAllFriend;             /**<    开启自动转发所有好友消息  */
 @property (nonatomic) BOOL autoAuthEnable;                      /**<    是否免认证登录    */
 @property (nonatomic) BOOL launchFromNew;                       /**<    是否是从 -> 登录新微信 -> 启动      */
+@property (nonatomic) BOOL enterMonitorEnable;                  /**<    是否开启进群监控*/
 @property (nonatomic) BOOL quitMonitorEnable;
 @property (nonatomic) BOOL autoLoginEnable;                     /**<    是否自动登录      */
 @property (nonatomic) BOOL onTop;                               /**<    是否要置顶微信    */
